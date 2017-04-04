@@ -1,2 +1,2 @@
-# alma_proposal_tools
-Tools for preparing ALMA proposals
+# almaprops
+ALMA homework code
