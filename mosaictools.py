@@ -9,6 +9,8 @@ class BBox:
         self.area = None
         self.length = None
         self.width = None
+        self.xcen = None
+        self.ycen = None
         
     def __repr__(self):
         return "Bounding box L:{0}, W:{1} oriented at {2}".format(
@@ -18,23 +20,27 @@ def rotbbox(x, y):
     hull = ConvexHull(np.c_[x,y])
     angle = np.zeros(len(hull.vertices))
     area = np.zeros(len(hull.vertices))
+    x0 = np.mean(hull.points[:, 0])
+    y0 = np.mean(hull.points[:, 1])
     for idx, vert in enumerate(hull.vertices):
         p1 = hull.points[vert]
         p2 = hull.points[hull.vertices[idx-1]]
         angle[idx] = np.arctan((p2[1]-p1[1])/(p2[0]-p1[0]))
+    angle *= -1
+    x = hull.points[:, 0] - x0
+    y = hull.points[:, 1] - y0
     for idx, phi in enumerate(angle):
-        xrot = hull.points[:, 0] * np.cos(phi) + \
-            hull.points[:, 1] * np.sin(phi)
-        yrot = -hull.points[:, 0] * np.sin(phi) + \
-            hull.points[:, 1]
+        xrot = x * np.cos(phi) + y * np.sin(phi)
+        yrot = -x * np.sin(phi) + x * np.cos(phi)
+
         DeltaX = np.nanmax(xrot) - np.nanmin(xrot)
         DeltaY = np.nanmax(yrot) - np.nanmin(yrot)
         area[idx] = DeltaX * DeltaY
     phi = angle[np.argmin(area)]
-    xrot = hull.points[:, 0] * np.cos(phi) + \
-        hull.points[:, 1] * np.sin(phi)
-    yrot = -hull.points[:, 0] * np.sin(phi) + \
-        hull.points[:, 1]
+
+    xrot = x * np.cos(phi) + y * np.sin(phi)
+    yrot = -x * np.sin(phi) + y * np.cos(phi)
+
     minxrot, maxxrot = np.nanmin(xrot), np.nanmax(xrot)
     minyrot, maxyrot = np.nanmin(yrot), np.nanmax(yrot)
     length = (maxxrot - minxrot)
@@ -45,10 +51,11 @@ def rotbbox(x, y):
                         [minxrot, maxyrot],
                         [maxxrot, maxyrot],
                         [maxxrot, minyrot]])
+
     xcorn = cornrot[:, 0] * np.cos(phi) - \
-        cornrot[:, 1] * np.sin(phi)
+        cornrot[:, 1] * np.sin(phi) + x0
     ycorn = cornrot[:, 0] * np.sin(phi) + \
-        cornrot[:, 1] * np.cos(phi)
+        cornrot[:, 1] * np.cos(phi) + y0
     corners = np.c_[xcorn, ycorn]
     box = BBox()
     box.corners = corners
@@ -56,5 +63,8 @@ def rotbbox(x, y):
     box.length = length
     box.width = width
     box.position_angle = phi
+    box.xcen = x0
+    box.ycen = y0
+    
     return box
 
