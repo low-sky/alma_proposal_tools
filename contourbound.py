@@ -77,7 +77,7 @@ def genboxes():
             p = box.length * dx[0] * 3600
             q = box.width * dx[0] * 3600
             area = p * q
-            ntile = np.ceil(p * q / 2e4)
+            ntile = np.ceil(p * q / 1.95e4)
             if ntile == 1:
                 t.add_row()
                 t[-1]['Galaxy'] = g.name
