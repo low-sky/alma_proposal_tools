@@ -1,6 +1,6 @@
 import astropy.units as u
 from astropy.io import fits
-from mosaictools import rotbbox, rotator
+from mosaictools import rotbbox, rotator, BBox
 from galaxies import Galaxy
 import glob
 import matplotlib._cntr as cntr
@@ -15,9 +15,11 @@ from astropy.table import Table, Column
 def imglist(datadir='/mnt/work/erosolow/phangs/proposal/lp_proposal_unwise_grab/'):
     return(glob.glob(datadir + '*band3*fits'))
 
-def contourbound(imagename, level=0.5 * u.MJy / u.sr, doplot=False):
+def contourbound(imagename, level=0.5 * u.MJy / u.sr,
+                 doplot=False, PixelMask=False):
     header = fits.getheader(imagename)
     data = fits.getdata(imagename)
+    
     level = 0.5
     X,Y = np.meshgrid(np.arange(data.shape[0]),
                       np.arange(data.shape[1]))
@@ -26,7 +28,10 @@ def contourbound(imagename, level=0.5 * u.MJy / u.sr, doplot=False):
     segs = nlist[:len(nlist)//2]
     shortfile = (imagename.split('/'))[-1]
     galname = (shortfile.split('_'))[0]
-    g = Galaxy(galname.upper())
+    try:
+        g = Galaxy(galname.upper())
+    except:
+        g = Galaxy(galname.upper())
     w = wcs.WCS(header)
     xcen, ycen = w.wcs_world2pix(g.center_position.ra.value,
                                  g.center_position.dec.value, 0)
@@ -51,6 +56,13 @@ def contourbound(imagename, level=0.5 * u.MJy / u.sr, doplot=False):
         plt.savefig(g.name+'_mosaic.png')
         plt.close()
         plt.clf()
+    if PixelMask:
+        mask = np.zeros_like(data, dtype='bool')
+        thispath = mplPath.Path(box.corners)
+        mask[X.ravel(), Y.ravel()] = thispath.contains_points(np.c_[X.ravel(),Y.ravel()])
+        mask = mask.astype(np.int)
+        hdu = fits.PrimaryHDU(mask, header=w.to_header())
+        hdu.writeto(imagename.replace('band3','band3_obsmask'), clobber=True)
     return(g, box, w)
     # import pdb; pdb.set_trace()
 
@@ -58,8 +70,11 @@ def contourbound(imagename, level=0.5 * u.MJy / u.sr, doplot=False):
 #Offset Longitude (arcsec),Offset Latitude (arcsec),p (arcsec),q (arcsec),PositionAngle (deg)
 
 def genboxes():
+    PixelMask = False
     ll = imglist()
-    namelist = np.loadtxt('proposed_targets_v1.txt',dtype='str')
+    namelist = np.loadtxt('proposed_targets_v2.txt',dtype='str')
+    if len(namelist.shape) > 1:
+        namelist = namelist[:, 0]
     t = Table(names=('Galaxy','SB','RA','Dec','LongOff',
                      'LatOff','p','q','PA'),
               dtype=('S8','i4','f8','f8','f8',
@@ -69,6 +84,15 @@ def genboxes():
         g, box, www = contourbound(l[0], doplot=True)
         if box is None:
             print "No contour? ", g.name
+            box = BBox()
+            box.corners = None
+            box.position_angle = 0.0 * u.deg
+            box.area = 3600.
+            box.length = 50.0
+            box.width = 50.0
+            box.xcen = 0.0
+            box.ycen = 0.0
+
         else:    
             ra0, dec0 = www.wcs_pix2world(box.xcen, box.ycen, 0)
             mosaicCenter = SkyCoord(ra0, dec0, unit=u.deg, frame='fk5')
@@ -77,7 +101,7 @@ def genboxes():
             p = box.length * dx[0] * 3600
             q = box.width * dx[0] * 3600
             area = p * q
-            ntile = np.ceil(p * q / 1.95e4)
+            ntile = np.ceil(p * q / 1.8e4)
             if ntile == 1:
                 t.add_row()
                 t[-1]['Galaxy'] = g.name
@@ -89,7 +113,10 @@ def genboxes():
                 t[-1]['p'] = p
                 t[-1]['q'] = q
                 t[-1]['PA'] = box.position_angle * 180 / np.pi
-
+                if PixelMask:
+                    writepixelmask(l[0], www, t[-1])
+#                if 'IC1954' in g.name:
+#                    import pdb; pdb.set_trace()
             if ntile > 1:
                 PisBigger = p > q
                 if PisBigger:
@@ -97,7 +124,7 @@ def genboxes():
                     Qnew = q
                 else:
                     Pnew = q / ntile
-                    Qnew = q
+                    Qnew = p
                     box.position_angle += np.pi / 2
                 
                 Poffset = np.linspace(-(ntile - 1) / 2,
@@ -120,5 +147,6 @@ def genboxes():
                     t[-1]['p'] = Pnew
                     t[-1]['q'] = Qnew
                     t[-1]['PA'] = box.position_angle * 180 / np.pi
-
+                    if PixelMask:
+                        writepixelmask(l[0], www, t[-1])
         t.write('boxes.csv')
