@@ -83,7 +83,7 @@ def genboxes():
         l = [l for l in ll if name in l]
         g, box, www = contourbound(l[0], doplot=True)
         if box is None:
-            print "No contour? ", g.name
+            print("No contour? ", g.name)
             box = BBox()
             box.corners = None
             box.position_angle = 0.0 * u.deg

@@ -26,7 +26,7 @@ for thisgal in root.findall('.//ns2:TargetParameters',nsdict):
     pkflux = thisgal.find('.//ns2:expectedPeakLineFluxDensity',nsdict)
     if np.isfinite(catalog_entry['PeakDetJykms']/50.0):
         pkflux.text = "{0:.0f}".format(catalog_entry['PeakDetJykms']/50.0*1e3)
-        print pkflux.text
+        print(pkflux.text)
     else:
         pkflux.text = "45.0"
     reffreq = np.float(thisgal.find('.//ns2:referenceFrequency',nsdict).text)
